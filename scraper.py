@@ -19,7 +19,7 @@ class Scraper:
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-    def fetch_articles(self, limit=30):
+    def fetch_articles(self, limit):
         """Fetches articles from Zendesk Help Center API.
 
         Args:
@@ -30,7 +30,7 @@ class Scraper:
         """
         articles = []
         auth = HTTPBasicAuth('ducthai060501@gmail.com/token', os.getenv("ZENDESK_API_TOKEN"))
-        url = f"{API_BASE_URL}?per_page={limit}"
+        url = f"{API_BASE_URL}"
         # Parameters
         params = {
             'per_page': limit  # Fetch 30 articles

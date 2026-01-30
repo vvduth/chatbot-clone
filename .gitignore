@@ -4,3 +4,6 @@ __pycache__/
 data/
 venv/
 .github
+.idea
+.DS_Store
+*.log

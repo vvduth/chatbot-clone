@@ -1,3 +1,4 @@
+import datetime
 import os
 import json
 import logging
@@ -28,7 +29,7 @@ class StateManager:
                     return {"articles": {}, "vector_store_id": None}
                 return json.loads(content)
         except Exception:
-            logging.warning(f"State file {self.filepath} is corrupted. Resetting state.")
+            logging.warning(f"State file {self.state_file} is corrupted. Resetting state.")
             return {"articles": {}, "vector_store_id": None}
 
     def save_state(self):
@@ -60,7 +61,7 @@ class StateManager:
         self.state["articles"][str(article_id)] = {
             "hash": file_hash,
             "openai_file_id": openai_file_id,
-            "updated_at": "now" # In real app use datetime
+            "updated_at": datetime.datetime.now().isoformat()
         }
     
     def get_vector_store_id(self):
@@ -78,3 +79,18 @@ class StateManager:
             vs_id (str): The Vector Store ID to save.
         """
         self.state["vector_store_id"] = vs_id
+    def get_all_article_ids(self):
+        """Retrieves all stored article IDs.
+
+        Returns:
+            list: A list of all article IDs in the state.
+        """
+        return list(self.state["articles"].keys())
+    def remove_article_state(self, article_id):
+        """Removes the state entry for a specific article.
+
+        Args:
+            article_id (int|str): The unique identifier of the article to remove.
+        """
+        if str(article_id) in self.state["articles"]:
+            del self.state["articles"][str(article_id)]

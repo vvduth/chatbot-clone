@@ -120,6 +120,38 @@ class VectorStoreManager:
                 logging.info(f"Deleted file {file.id} from Vector Store {vector_store_id}.")
         except Exception as e:
             logging.error(f"Failed to clear files from Vector Store {vector_store_id}: {e}")
+    def remove_file_from_openai(self, file_id):
+        """Deletes a file from OpenAI storage.
+
+        Args:
+            file_id (str): The ID of the file to delete.
+        """
+        if not self.client or not file_id: return
+        
+        try:
+            self.client.files.delete(
+                file_id=file_id
+            )
+            logging.info(f"Deleted file {file_id} from OpenAI storage.")
+        except Exception as e:
+            logging.error(f"Failed to delete file {file_id} from OpenAI storage: {e}")
+    def remove_file_from_vector_store(self, vector_store_id, file_id):
+        """Deletes a file from the specified Vector Store.
+
+        Args:
+            vector_store_id (str): The ID of the Vector Store.
+            file_id (str): The ID of the file to delete.
+        """
+        if not self.client or not vector_store_id or not file_id: return
+        
+        try:
+            self.client.vector_stores.files.delete(
+                vector_store_id=vector_store_id,
+                file_id=file_id
+            )
+            logging.info(f"Deleted file {file_id} from Vector Store {vector_store_id}.")
+        except Exception as e:
+            logging.error(f"Failed to delete file {file_id} from Vector Store {vector_store_id}: {e}")
     def clear_file_from_storage(self):
         """Deletes all files from OpenAI storage.
 

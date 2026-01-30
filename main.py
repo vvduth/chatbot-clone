@@ -20,9 +20,36 @@ def main():
     # Initialize Vector Store
     vs_id = vector_manager.get_or_create_vector_store(state_manager)
     
-    articles = scraper.fetch_articles(limit=5)
+    articles = scraper.fetch_articles(limit=None)
     
-    stats = {"added": 0, "updated": 0, "skipped": 0}
+    stats = {"added": 0, "updated": 0, "skipped": 0, "deleted": 0}
+    
+    # get newly fetch articles ids
+    newly_fetched_ids = {str(article.get("id")) for article in articles}
+    
+    # get ids from state.json
+    stored_ids = set(state_manager.get_all_article_ids())
+    
+    ids_to_delete = stored_ids - newly_fetched_ids
+    
+    if ids_to_delete:
+        logging.info(f"Deleting {len(ids_to_delete)} articles no longer present in source.")
+        for article_id in ids_to_delete:
+            # get openai_file_id
+            article_state = state_manager.get_article_state(article_id)
+            openai_file_id = article_state.get("openai_file_id")
+            if vs_id and openai_file_id:
+                try:
+                    vector_manager.remove_file_from_vector_store(vs_id, openai_file_id)
+                    vector_manager.remove_file_from_openai(openai_file_id)
+                    logging.info(f"Removed file {openai_file_id} from Vector Store and OpenAI.")
+                except Exception as e:
+                    logging.error(f"Error removing file {openai_file_id}: {e}")
+            # remove local file if exists
+            state_manager.remove_article_state(article_id)
+            stats["deleted"] += 1
+            logging.info(f"Removed article {article_id} from state.")            
+    
     
     for article in articles:
         article_id = article.get('id')
@@ -74,9 +101,9 @@ def main_test():
     
     Orchestrates the scraping, processing, state management, and OpenAI upload workflow.
     """
-    vector_manager = VectorStoreManager(OPENAI_API_KEY)
-    vector_manager.clear_file_from_storage()
-    vector_manager.clear_all_files_from_vector_store("vs_697b2d0fe55c8191838044152526f53a")
+    scraper = Scraper(OUTPUT_DIR)
+    articles = scraper.fetch_articles(limit=None)
+    print(f"Fetched {len(articles)} articles.")
 
 if __name__ == "__main__":
     main()
