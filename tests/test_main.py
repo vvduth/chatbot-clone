@@ -32,8 +32,8 @@ class TestMain:
         mock_scraper = MagicMock(spec=Scraper)
         mock_scraper.fetch_articles.return_value = sample_articles_list
         mock_scraper.process_article.side_effect = [
-            (os.path.join(temp_output_dir, "12345-Article-1.md"), "# Article 1\n\nContent", "hash1"),
-            (os.path.join(temp_output_dir, "67890-Article-2.md"), "# Article 2\n\nContent", "hash2")
+            (os.path.join(temp_output_dir, "12345-Article-1.md"), "# Article 1\n\nContent", "hash1", "2024-01-01T00:00:00"),
+            (os.path.join(temp_output_dir, "67890-Article-2.md"), "# Article 2\n\nContent", "hash2", "2024-01-02T00:00:00")
         ]
         mock_scraper_class.return_value = mock_scraper
         
@@ -43,7 +43,8 @@ class TestMain:
         mock_vector_manager_class.return_value = mock_vector_manager
         
         # Run main
-        main()
+        with patch('main.os.path.exists', return_value=False):
+            result = main()
         
         # Verify state manager was initialized
         mock_state_manager_class.assert_called_once()
@@ -63,8 +64,12 @@ class TestMain:
         # Verify files were added to vector store
         assert mock_vector_manager.add_file_to_vector_store.call_count == 2
         
-        # Verify state was updated
+        # Verify state was updated (with last_modified parameter)
         assert mock_state_manager.update_article_state.call_count == 2
+        # Check that last_modified was passed
+        calls = mock_state_manager.update_article_state.call_args_list
+        assert calls[0][0][3] == "2024-01-01T00:00:00"  # last_modified parameter
+        assert calls[1][0][3] == "2024-01-02T00:00:00"
         
         # Verify state was saved
         mock_state_manager.save_state.assert_called_once()
@@ -98,7 +103,8 @@ class TestMain:
         mock_scraper.process_article.return_value = (
             os.path.join(temp_output_dir, "12345-Test-Article.md"), 
             "# Test Article\n\nContent", 
-            "hash1"  # Same hash
+            "hash1",  # Same hash
+            "2024-01-01T00:00:00"  # Same last_modified
         )
         mock_scraper_class.return_value = mock_scraper
         
@@ -140,8 +146,13 @@ class TestMain:
         # Setup mocks
         mock_state_manager = MagicMock(spec=StateManager)
         mock_state_manager.get_all_article_ids.return_value = ["12345"]
-        # get_article_state is called with article_id (int 12345) in main.py line 62
-        mock_state_manager.get_article_state.return_value = {"hash": "old_hash", "openai_file_id": "file_1"}
+        # get_article_state is called with article_id (int 12345) in main.py line 74
+        # State has old hash and old last_modified, but new hash and new last_modified are different
+        mock_state_manager.get_article_state.return_value = {
+            "hash": "old_hash", 
+            "openai_file_id": "file_1",
+            "last_modified": "2024-01-01T00:00:00"  # Different from new last_modified
+        }
         mock_state_manager.get_vector_store_id.return_value = "vs_123"
         mock_state_manager_class.return_value = mock_state_manager
         
@@ -151,7 +162,8 @@ class TestMain:
         mock_scraper.process_article.return_value = (
             filepath, 
             "# Test Article\n\nUpdated Content", 
-            "new_hash"  # Different hash
+            "new_hash",  # Different hash
+            "2024-01-02T00:00:00"  # Different last_modified
         )
         mock_scraper_class.return_value = mock_scraper
         
@@ -172,9 +184,9 @@ class TestMain:
         # Verify file was added to vector store
         mock_vector_manager.add_file_to_vector_store.assert_called_once_with("vs_123", "file_new")
         
-        # Verify state was updated (article_id is int 12345 in main.py)
+        # Verify state was updated (article_id is int 12345 in main.py, with last_modified)
         mock_state_manager.update_article_state.assert_called_once_with(
-            12345, "new_hash", "file_new"
+            12345, "new_hash", "file_new", "2024-01-02T00:00:00"
         )
     
     @patch('main.VectorStoreManager')
@@ -197,7 +209,7 @@ class TestMain:
         mock_state_manager_class.return_value = mock_state_manager
         
         mock_scraper = MagicMock(spec=Scraper)
-        mock_scraper.fetch_articles.return_value = []  # No articles returned
+        mock_scraper.fetch_articles.return_value = []  # No articles returned (but deletion should still happen)
         mock_scraper_class.return_value = mock_scraper
         
         mock_vector_manager = MagicMock(spec=VectorStoreManager)
@@ -205,7 +217,7 @@ class TestMain:
         mock_vector_manager_class.return_value = mock_vector_manager
         
         # Run main
-        main()
+        result = main()
         
         # Verify files were removed from vector store
         assert mock_vector_manager.remove_file_from_vector_store.call_count == 2
@@ -244,7 +256,7 @@ class TestMain:
         
         mock_scraper = MagicMock(spec=Scraper)
         mock_scraper.fetch_articles.return_value = [article]
-        mock_scraper.process_article.return_value = (None, None, None)  # No body
+        mock_scraper.process_article.return_value = (None, None, None, None)  # No body
         mock_scraper_class.return_value = mock_scraper
         
         mock_vector_manager = MagicMock(spec=VectorStoreManager)
@@ -292,7 +304,8 @@ class TestMain:
         mock_scraper.process_article.return_value = (
             os.path.join(temp_output_dir, "12345-Test-Article.md"), 
             "# Test Article\n\nContent", 
-            "hash1"
+            "hash1",
+            "2024-01-01T00:00:00"
         )
         mock_scraper_class.return_value = mock_scraper
         
@@ -311,9 +324,9 @@ class TestMain:
         # Verify file was NOT uploaded (no vector store)
         mock_vector_manager.upload_file.assert_not_called()
         
-        # Verify state was updated with None file_id (article_id is int 12345 in main.py)
+        # Verify state was updated with None file_id (article_id is int 12345 in main.py, with last_modified)
         mock_state_manager.update_article_state.assert_called_once_with(
-            12345, "hash1", None
+            12345, "hash1", None, "2024-01-01T00:00:00"
         )
     
     @patch('main.VectorStoreManager')
@@ -344,7 +357,8 @@ class TestMain:
         mock_scraper.process_article.return_value = (
             os.path.join(temp_output_dir, "12345-Test-Article.md"), 
             "# Test Article\n\nContent", 
-            "hash1"
+            "hash1",
+            "2024-01-01T00:00:00"
         )
         mock_scraper_class.return_value = mock_scraper
         
@@ -354,7 +368,8 @@ class TestMain:
         mock_vector_manager_class.return_value = mock_vector_manager
         
         # Run main
-        main()
+        with patch('main.os.path.exists', return_value=False):
+            main()
         
         # Verify upload was attempted
         mock_vector_manager.upload_file.assert_called_once()
@@ -423,9 +438,9 @@ class TestMain:
             if article_id == 1:
                 return {}  # New article
             elif article_id == 2:
-                return {"hash": "old", "openai_file_id": "file_2"}  # Updated article
+                return {"hash": "old", "openai_file_id": "file_2", "last_modified": "2024-01-01T00:00:00"}  # Updated article
             elif article_id == 3:
-                return {"hash": "hash3", "openai_file_id": "file_3"}  # Skipped article
+                return {"hash": "hash3", "openai_file_id": "file_3", "last_modified": "2024-01-03T00:00:00"}  # Skipped article (hash and last_modified match)
             return {}
         
         mock_state_manager = MagicMock(spec=StateManager)
@@ -437,9 +452,9 @@ class TestMain:
         mock_scraper = MagicMock(spec=Scraper)
         mock_scraper.fetch_articles.return_value = articles
         mock_scraper.process_article.side_effect = [
-            (os.path.join(temp_output_dir, "1-New.md"), "# New\n\nContent", "hash1"),
-            (os.path.join(temp_output_dir, "2-Updated.md"), "# Updated\n\nContent", "hash2"),
-            (os.path.join(temp_output_dir, "3-Skipped.md"), "# Skipped\n\nContent", "hash3")
+            (os.path.join(temp_output_dir, "1-New.md"), "# New\n\nContent", "hash1", "2024-01-01T00:00:00"),
+            (os.path.join(temp_output_dir, "2-Updated.md"), "# Updated\n\nContent", "hash2", "2024-01-02T00:00:00"),
+            (os.path.join(temp_output_dir, "3-Skipped.md"), "# Skipped\n\nContent", "hash3", "2024-01-03T00:00:00")
         ]
         mock_scraper_class.return_value = mock_scraper
         

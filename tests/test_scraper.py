@@ -121,7 +121,7 @@ class TestScraper:
     def test_process_article_success(self, temp_output_dir, sample_article):
         """Test successful article processing."""
         scraper = Scraper(temp_output_dir)
-        filepath, content, content_hash = scraper.process_article(sample_article)
+        filepath, content, content_hash, last_modified = scraper.process_article(sample_article)
         
         assert filepath is not None
         assert content is not None
@@ -141,11 +141,12 @@ class TestScraper:
         }
         
         scraper = Scraper(temp_output_dir)
-        filepath, content, content_hash = scraper.process_article(article)
+        filepath, content, content_hash, last_modified = scraper.process_article(article)
         
         assert filepath is None
         assert content is None
         assert content_hash is None
+        assert last_modified is None
     
     def test_process_article_missing_body_key(self, temp_output_dir):
         """Test processing article with missing body key."""
@@ -156,17 +157,18 @@ class TestScraper:
         }
         
         scraper = Scraper(temp_output_dir)
-        filepath, content, content_hash = scraper.process_article(article)
+        filepath, content, content_hash, last_modified = scraper.process_article(article)
         
         assert filepath is None
         assert content is None
         assert content_hash is None
+        assert last_modified is None
     
     def test_process_article_hash_consistency(self, temp_output_dir, sample_article):
         """Test that content hash is consistent for same content."""
         scraper = Scraper(temp_output_dir)
-        _, content1, hash1 = scraper.process_article(sample_article)
-        _, content2, hash2 = scraper.process_article(sample_article)
+        _, content1, hash1, _ = scraper.process_article(sample_article)
+        _, content2, hash2, _ = scraper.process_article(sample_article)
         
         assert hash1 == hash2
         assert content1 == content2
@@ -187,8 +189,8 @@ class TestScraper:
         }
         
         scraper = Scraper(temp_output_dir)
-        _, _, hash1 = scraper.process_article(article1)
-        _, _, hash2 = scraper.process_article(article2)
+        _, _, hash1, _ = scraper.process_article(article1)
+        _, _, hash2, _ = scraper.process_article(article2)
         
         assert hash1 != hash2
     
@@ -202,7 +204,7 @@ class TestScraper:
         }
         
         scraper = Scraper(temp_output_dir)
-        filepath, _, _ = scraper.process_article(article)
+        filepath, _, _, _ = scraper.process_article(article)
         
         assert "12345" in filepath
         assert "Test-Article--With-Special-Chars" in filepath
@@ -220,7 +222,7 @@ class TestScraper:
         }
         
         scraper = Scraper(temp_output_dir)
-        filepath, content, _ = scraper.process_article(article)
+        filepath, content, _, _ = scraper.process_article(article)
         
         assert "Untitled" in content
         assert filepath is not None
@@ -235,7 +237,7 @@ class TestScraper:
         }
         
         scraper = Scraper(temp_output_dir)
-        _, content, _ = scraper.process_article(article)
+        _, content, _, _ = scraper.process_article(article)
         
         # Check that HTML tags are removed/converted
         assert "<h1>" not in content
@@ -247,7 +249,7 @@ class TestScraper:
     def test_process_article_filepath_in_output_dir(self, temp_output_dir, sample_article):
         """Test that filepath is within output directory."""
         scraper = Scraper(temp_output_dir)
-        filepath, _, _ = scraper.process_article(sample_article)
+        filepath, _, _, _ = scraper.process_article(sample_article)
         
         assert filepath.startswith(temp_output_dir)
         assert os.path.dirname(filepath) == temp_output_dir
@@ -255,7 +257,7 @@ class TestScraper:
     def test_process_article_content_structure(self, temp_output_dir, sample_article):
         """Test that processed content has correct structure."""
         scraper = Scraper(temp_output_dir)
-        _, content, _ = scraper.process_article(sample_article)
+        _, content, _, _ = scraper.process_article(sample_article)
         
         assert content.startswith("#")
         assert "Article URL:" in content
