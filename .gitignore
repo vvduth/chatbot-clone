@@ -7,3 +7,7 @@ venv/
 .idea
 .DS_Store
 *.log
+.pytest_cache/
+coverage.xml
+.coverage
+.vscode/
