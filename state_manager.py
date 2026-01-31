@@ -2,20 +2,34 @@ import datetime
 import os
 import json
 import logging
+import boto3
+from botocore.exceptions import NoCredentialsError, ClientError
+import dotenv
+
+dotenv.load_dotenv()
 class StateManager:
     """Manages the state of processed articles and the vector store ID."""
 
-    def __init__(self, state_file):
-        """Initializes the StateManager.
-        
-        Args:
-            state_file (str): The path to the JSON file where state is stored.
+    def __init__(self):
+        """Initializes the StateManager, get state from DO bucket
         """
-        self.state_file = state_file
+        self.use_bucket = use_bucket or os.getenv("USE_DO_BUCKET", "false").lower() == "true"
+        
+        # digitalOcean spaces
+        self.bucket_name = os.getenv("BUCKET_NAME")
+        self.bucket_secret_access_key = os.getenv("BUCKET_SECRET_ACCESS_KEY")
+        
+        if self.use_bucket:
+            self.s3_client = boto3.client(
+                's3',
+                region_name='fra1',
+                endpoint_url='https://fra1.digitaloceanspaces.com',
+                aws_access_key_id=os.getenv("BUCKET_ACCESS_KEY_ID"),
+                aws_secret_access_key=self.bucket_secret_access_key
+            )
         self.state = self._load_state()
-
     def _load_state(self):
-        """Loads the state from the JSON file. 
+        """Loads the state from DO bucket. 
         
         Returns:
             dict: The loaded state or a default empty state if the file doesn't exist.
