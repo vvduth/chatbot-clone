@@ -120,6 +120,12 @@ class StateManager:
             list: A list of all article IDs in the state.
         """
         return list(self.state["articles"].keys())
+    def remove_all_article_states(self):
+        """Removes all article states and saves to file."""
+        self.state["articles"] = {}
+        self.save_state()
+        
+        
     def remove_article_state(self, article_id):
         """Removes the state entry for a specific article.
 

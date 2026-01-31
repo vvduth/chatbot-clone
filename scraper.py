@@ -20,6 +20,16 @@ class Scraper:
         self.output_dir = output_dir
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
+    
+    def clear_output_directory(self):
+        """Clears all files in the output directory."""
+        for filename in os.listdir(self.output_dir):
+            file_path = os.path.join(self.output_dir, filename)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+            except Exception as e:
+                logging.error(f"Error deleting file {file_path}: {e}")
 
     def fetch_articles(self, limit):
         """Fetches articles from Zendesk Help Center API.
