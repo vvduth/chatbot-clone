@@ -132,6 +132,10 @@ def main():
             logging.error(f"Error saving state: {e}")
             exit_code = 1
         
+        # Log vector store statistics
+        if vs_id:
+            vector_manager.log_vector_store_stats(vs_id)
+        
         logging.info("=" * 60)
         logging.info(f"Job Complete. Stats: {stats}")
         logging.info("=" * 60)
