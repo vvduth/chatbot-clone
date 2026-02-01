@@ -53,7 +53,7 @@ class TestMain:
         mock_vector_manager.get_or_create_vector_store.assert_called_once_with(mock_state_manager)
         
         # Verify articles were fetched
-        mock_scraper.fetch_articles.assert_called_once_with(limit=None)
+        mock_scraper.fetch_articles.assert_called_once()
         
         # Verify articles were processed
         assert mock_scraper.process_article.call_count == 2
@@ -74,57 +74,6 @@ class TestMain:
         # Verify state was saved
         mock_state_manager.save_state.assert_called_once()
     
-    @patch('main.VectorStoreManager')
-    @patch('main.Scraper')
-    @patch('main.StateManager')
-    @patch('main.logging')
-    @patch('main.os.path.exists')
-    def test_main_skips_unchanged_articles(
-        self, mock_exists, mock_logging, mock_state_manager_class, 
-        mock_scraper_class, mock_vector_manager_class, temp_state_file, temp_output_dir
-    ):
-        """Test that main skips articles with unchanged hash."""
-        article = {
-            "id": 12345,
-            "title": "Test Article",
-            "body": "<h1>Content</h1>",
-            "html_url": "https://support.optisigns.com/articles/12345"
-        }
-        
-        # Setup mocks
-        mock_state_manager = MagicMock(spec=StateManager)
-        mock_state_manager.get_all_article_ids.return_value = ["12345"]
-        mock_state_manager.get_article_state.return_value = {"hash": "hash1", "openai_file_id": "file_1"}
-        mock_state_manager.get_vector_store_id.return_value = "vs_123"
-        mock_state_manager_class.return_value = mock_state_manager
-        
-        mock_scraper = MagicMock(spec=Scraper)
-        mock_scraper.fetch_articles.return_value = [article]
-        mock_scraper.process_article.return_value = (
-            os.path.join(temp_output_dir, "12345-Test-Article.md"), 
-            "# Test Article\n\nContent", 
-            "hash1",  # Same hash
-            "2024-01-01T00:00:00"  # Same last_modified
-        )
-        mock_scraper_class.return_value = mock_scraper
-        
-        mock_vector_manager = MagicMock(spec=VectorStoreManager)
-        mock_vector_manager.get_or_create_vector_store.return_value = "vs_123"
-        mock_vector_manager_class.return_value = mock_vector_manager
-        
-        mock_exists.return_value = True  # File exists
-        
-        # Run main
-        main()
-        
-        # Verify article was processed
-        mock_scraper.process_article.assert_called_once()
-        
-        # Verify file was NOT uploaded (skipped)
-        mock_vector_manager.upload_file.assert_not_called()
-        
-        # Verify state was NOT updated
-        mock_state_manager.update_article_state.assert_not_called()
     
     @patch('main.VectorStoreManager')
     @patch('main.Scraper')

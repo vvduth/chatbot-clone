@@ -5,6 +5,9 @@ from config import OUTPUT_DIR, STATE_FILE, OPENAI_API_KEY
 from state_manager import StateManager
 from vector_store_manager import VectorStoreManager
 from scraper import Scraper
+import boto3
+from botocore.exceptions import NoCredentialsError, ClientError
+import json
 
 # Setup logging
 logging.basicConfig(
@@ -24,7 +27,7 @@ def main():
         logging.info("Starting OptiBot scraper job")
         logging.info("=" * 60)
         
-        state_manager = StateManager(STATE_FILE)
+        state_manager = StateManager()
         vector_manager = VectorStoreManager(OPENAI_API_KEY)
         scraper = Scraper(OUTPUT_DIR)
         
@@ -59,8 +62,8 @@ def main():
                         exit_code = 1
                 # remove local file if exists
                 state_manager.remove_article_state(article_id)
-            stats["deleted"] += 1
-            logging.info(f"Removed article {article_id} from state.")
+                stats["deleted"] += 1
+                logging.info(f"Removed article {article_id} from state.")
         
         # Process articles with enhanced delta detection
         for article in articles:
@@ -77,16 +80,11 @@ def main():
             
             # Fast path: if last_modified matches and hash matches, skip
             if stored_last_modified and last_modified:
-                if stored_last_modified == last_modified and last_hash == content_hash and os.path.exists(filepath):
+                if stored_last_modified == last_modified and last_hash == content_hash:
                     logging.info(f"Skipping {article_id} (No changes - hash and last_modified match)")
                     stats["skipped"] += 1
                     continue
             
-            # Fallback: if hash matches and file exists, skip (backward compatibility)
-            if last_hash == content_hash and os.path.exists(filepath):
-                logging.info(f"Skipping {article_id} (No changes - hash matches)")
-                stats["skipped"] += 1
-                continue
 
             # Save file locally
             try:
@@ -132,10 +130,6 @@ def main():
             logging.error(f"Error saving state: {e}")
             exit_code = 1
         
-        # Log vector store statistics
-        if vs_id:
-            vector_manager.log_vector_store_stats(vs_id)
-        
         logging.info("=" * 60)
         logging.info(f"Job Complete. Stats: {stats}")
         logging.info("=" * 60)
@@ -152,9 +146,21 @@ def main_test():
     
     Orchestrates the scraping, processing, state management, and OpenAI upload workflow.
     """
+    state_manager = StateManager()
+    state = state_manager.state
+    print(json.dumps(state, indent=2))
+
+def clear_everything():
+    state_manager = StateManager()
+    vector_manager = VectorStoreManager(OPENAI_API_KEY)
     scraper = Scraper(OUTPUT_DIR)
-    articles = scraper.fetch_articles(limit=None)
-    print(f"Fetched {len(articles)} articles.")
+
+    vector_manager.clear_all_files_from_vector_store('vs_697b2d0fe55c8191838044152526f53a')
+    vector_manager.clear_file_from_storage()
+    state_manager.remove_all_article_states()
+    scraper.clear_output_directory()
+    return 0
+
 
 if __name__ == "__main__":
     exit_code = main()

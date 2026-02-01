@@ -28,9 +28,11 @@ class TestVectorStoreManager:
         assert manager.client is None
     
     @patch('vector_store_manager.OpenAI')
-    def test_get_or_create_vector_store_existing_valid(self, mock_openai_class, temp_state_file):
+    @patch('state_manager.boto3.client')
+    def test_get_or_create_vector_store_existing_valid(self, mock_boto_client, mock_openai_class, env_vars, mock_s3_client):
         """Test getting existing valid vector store."""
-        state_manager = StateManager(temp_state_file)
+        mock_boto_client.return_value = mock_s3_client
+        state_manager = StateManager()
         state_manager.set_vector_store_id("vs_existing")
         
         mock_client = MagicMock()
@@ -46,9 +48,11 @@ class TestVectorStoreManager:
         mock_client.vector_stores.retrieve.assert_called_once_with(vector_store_id="vs_existing")
     
     @patch('vector_store_manager.OpenAI')
-    def test_get_or_create_vector_store_existing_invalid(self, mock_openai_class, temp_state_file):
+    @patch('state_manager.boto3.client')
+    def test_get_or_create_vector_store_existing_invalid(self, mock_boto_client, mock_openai_class, env_vars, mock_s3_client):
         """Test creating new vector store when existing one is invalid."""
-        state_manager = StateManager(temp_state_file)
+        mock_boto_client.return_value = mock_s3_client
+        state_manager = StateManager()
         state_manager.set_vector_store_id("vs_invalid")
         
         mock_client = MagicMock()
@@ -67,9 +71,11 @@ class TestVectorStoreManager:
         mock_client.vector_stores.create.assert_called_once()
     
     @patch('vector_store_manager.OpenAI')
-    def test_get_or_create_vector_store_new(self, mock_openai_class, temp_state_file):
+    @patch('state_manager.boto3.client')
+    def test_get_or_create_vector_store_new(self, mock_boto_client, mock_openai_class, env_vars, mock_s3_client):
         """Test creating new vector store when none exists."""
-        state_manager = StateManager(temp_state_file)
+        mock_boto_client.return_value = mock_s3_client
+        state_manager = StateManager()
         
         mock_client = MagicMock()
         mock_new_vs = MagicMock()
@@ -87,9 +93,11 @@ class TestVectorStoreManager:
         assert 'expires_after' in call_args[1]
     
     @patch('vector_store_manager.OpenAI')
-    def test_get_or_create_vector_store_creation_failure(self, mock_openai_class, temp_state_file):
+    @patch('state_manager.boto3.client')
+    def test_get_or_create_vector_store_creation_failure(self, mock_boto_client, mock_openai_class, env_vars, mock_s3_client):
         """Test handling vector store creation failure."""
-        state_manager = StateManager(temp_state_file)
+        mock_boto_client.return_value = mock_s3_client
+        state_manager = StateManager()
         
         mock_client = MagicMock()
         mock_client.vector_stores.create.side_effect = Exception("API Error")
@@ -100,9 +108,11 @@ class TestVectorStoreManager:
         
         assert vs_id is None
     
-    def test_get_or_create_vector_store_no_client(self, temp_state_file):
+    @patch('state_manager.boto3.client')
+    def test_get_or_create_vector_store_no_client(self, mock_boto_client, env_vars, mock_s3_client):
         """Test that None is returned when client is not available."""
-        state_manager = StateManager(temp_state_file)
+        mock_boto_client.return_value = mock_s3_client
+        state_manager = StateManager()
         manager = VectorStoreManager(None)
         vs_id = manager.get_or_create_vector_store(state_manager)
         
