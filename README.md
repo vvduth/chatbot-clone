@@ -1,6 +1,6 @@
 # OptiBot Scraper
 
-A Python pipeline that syncs Zendesk Help Center articles to an OpenAI Vector Store for AI-powered customer support.
+A Python pipeline that syncs OptiSigns Help Center articles to an OpenAI Vector Store for AI-powered customer support.
 
 ## What It Does
 
@@ -9,6 +9,11 @@ A Python pipeline that syncs Zendesk Help Center articles to an OpenAI Vector St
 3. Uploads changed files to OpenAI Vector Store
 4. Tracks state to avoid redundant uploads (cost optimization)
 
+## Screen Shot
+![agent reply](<working link youtube.png>)
+* <i>Example of AI-powered agent replying using embeddings from Zendesk articles with citation.</i>
+
+![another reply](<microsoft res.png>)
 ## Architecture
 
 ```
