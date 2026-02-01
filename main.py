@@ -80,16 +80,11 @@ def main():
             
             # Fast path: if last_modified matches and hash matches, skip
             if stored_last_modified and last_modified:
-                if stored_last_modified == last_modified and last_hash == content_hash and os.path.exists(filepath):
+                if stored_last_modified == last_modified and last_hash == content_hash:
                     logging.info(f"Skipping {article_id} (No changes - hash and last_modified match)")
                     stats["skipped"] += 1
                     continue
             
-            # Fallback: if hash matches and file exists, skip (backward compatibility)
-            if last_hash == content_hash and os.path.exists(filepath):
-                logging.info(f"Skipping {article_id} (No changes - hash matches)")
-                stats["skipped"] += 1
-                continue
 
             # Save file locally
             try:
@@ -135,10 +130,6 @@ def main():
             logging.error(f"Error saving state: {e}")
             exit_code = 1
         
-        # Log vector store statistics
-        # if vs_id:
-        #     vector_manager.log_vector_store_stats(vs_id)
-        
         logging.info("=" * 60)
         logging.info(f"Job Complete. Stats: {stats}")
         logging.info("=" * 60)
@@ -155,37 +146,9 @@ def main_test():
     
     Orchestrates the scraping, processing, state management, and OpenAI upload workflow.
     """
-    bucket_name = os.getenv("BUCKET_NAME")
-    bucket_secret_access_key = os.getenv("BUCKET_SECRET_ACCESS_KEY")
-    state_key = "state.json"
-
-    s3_client = boto3.client(
-        's3',
-        region_name='fra1',
-        endpoint_url='https://fra1.digitaloceanspaces.com',
-        aws_access_key_id=os.getenv("BUCKET_ACCESS_KEY_ID"),
-        aws_secret_access_key=bucket_secret_access_key
-    )
-
-    try:
-        response = s3_client.get_object(
-            Bucket=bucket_name,
-            Key=state_key
-        )
-        content = response['Body'].read().decode('utf-8')
-        if not content.strip():
-            return {"articles": {}, "vector_store_id": None}
-        print(content)
-        return json.loads(content)
-    except ClientError as e:
-        if e.response['Error']['Code'] == 'NoSuchKey':
-            logging.info("No existing state in Spaces, starting fresh.")
-            return {"articles": {}, "vector_store_id": None}
-        logging.error(f"Error loading state from Spaces: {e}")
-        return {"articles": {}, "vector_store_id": None}
-    except Exception as e:
-        logging.warning(f"Error loading state from Spaces: {e}. Starting fresh.")
-        return {"articles": {}, "vector_store_id": None}
+    state_manager = StateManager()
+    state = state_manager.state
+    print(json.dumps(state, indent=2))
 
 def clear_everything():
     state_manager = StateManager()
