@@ -1,45 +1,38 @@
-name: optibot-scraper
-region: nyc
+name: chatbot-clone
+region: fra1
 
 jobs:
-- name: daily-scraper
-  github:
-    repo: vvduth/chatbot-clone
-    branch: main
-    deploy_on_push: false
-  source_dir: /
-  dockerfile_path: Dockerfile
-  schedule:
-    cron: "*/5 * * * *"  # every 5 mins to test at first
-  instance_count: 1
-  instance_size_slug: basic-xxs  # Minimal resources for scheduled job
-  envs:
-  - key: OPENAI_API_KEY
-    scope: RUN_TIME
-    type: SECRET
-    value: ${OPENAI_API_KEY}
-  - key: ZENDESK_API_TOKEN
-    scope: RUN_TIME
-    type: SECRET
-    value: ${ZENDESK_API_TOKEN}
-  - key: ZENDESK_EMAIL
-    scope: RUN_TIME
-    type: SECRET
-    value: ${ZENDESK_EMAIL}
-  - key: ZENDESK_DOMAIN
-    scope: RUN_TIME
-    type: GENERAL
-    value: support.optisigns.com
-  - key: OUTPUT_DIR
-    scope: RUN_TIME
-    type: GENERAL
-    value: data/articles
-  - key: STATE_FILE
-    scope: RUN_TIME
-    type: GENERAL
-    value: data/state.json
-  volumes:
-  - path: /app/data
-    name: scraper-state
-    mount_path: /app/data
-    size_gigabytes: 1
+  - name: sync-articles
+    kind: PRE_DEPLOY
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    dockerfile_path: Dockerfile
+    
+    # Schedule: Run daily at 2:00 AM UTC
+    run_command: python main.py
+    
+    envs:
+      - key: OPENAI_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: ZENDESK_API_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+      - key: USE_DO_SPACES
+        scope: RUN_TIME
+        value: "true"
+      - key: DO_SPACES_BUCKET
+        scope: RUN_TIME
+        value: "your-bucket-name"
+      - key: DO_SPACES_REGION
+        scope: RUN_TIME
+        value: "nyc3"
+      - key: DO_SPACES_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: DO_SPACES_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: DO_SPACES_STATE_KEY
+        scope: RUN_TIME
+        value: "chatbot-clone/state.json"

@@ -78,13 +78,12 @@ class VectorStoreManager:
             logging.error(f"Failed to upload {filepath}: {e}")
             return None
 
-    def add_file_to_vector_store(self, vector_store_id, file_id, wait_for_completion=True, max_wait_seconds=60):
+    def add_file_to_vector_store(self, vector_store_id, file_id, max_wait_seconds=60):
         """Links an uploaded file to a Vector Store and waits for processing to log status.
 
         Args:
             vector_store_id (str): The ID of the Vector Store.
             file_id (str): The ID of the uploaded file.
-            wait_for_completion (bool): Whether to wait for embedding to complete.
             max_wait_seconds (int): Maximum seconds to wait for completion.
 
         Returns:
@@ -98,45 +97,18 @@ class VectorStoreManager:
                 vector_store_id=vector_store_id,
                 file_id=file_id
             )
-            
-            # Wait for processing to complete if requested
-            if wait_for_completion and vs_file.status != "completed":
-                start_time = time.time()
-                while vs_file.status not in ("completed", "failed", "cancelled"):
-                    if time.time() - start_time > max_wait_seconds:
-                        logging.warning(f"Timeout waiting for file {file_id} to complete embedding")
-                        break
-                    time.sleep(2)  # Poll every 2 seconds
-                    try:
-                        vs_file = self.client.vector_stores.files.retrieve(
-                            vector_store_id=vector_store_id,
-                            file_id=file_id
-                        )
-                    except Exception as e:
-                        logging.warning(f"Error checking file status: {e}")
-                        break
+
             
             # Log file and chunk information
             file_info = {
                 "file_id": file_id,
                 "status": vs_file.status
             }
-            
-            # Try to get chunk count from the file object
-            chunk_count = None
-            if hasattr(vs_file, "chunk_counts"):
-                if isinstance(vs_file.chunk_counts, dict):
-                    chunk_count = vs_file.chunk_counts.get("total")
-                elif hasattr(vs_file.chunk_counts, "total"):
-                    chunk_count = vs_file.chunk_counts.total
-            
-            file_info["chunk_count"] = chunk_count
+
             
             if vs_file.status == "completed":
-                chunk_info = ""
-                if chunk_count is not None:
-                    chunk_info = f" with {chunk_count} chunk(s)"
-                logging.info(f"Successfully linked and embedded file {file_id} in Vector Store {vector_store_id}{chunk_info}. Status: {vs_file.status}")
+
+                logging.info(f"Successfully linked and embedded file {file_id} in Vector Store {vector_store_id}. Status: {vs_file.status}")
             else:
                 error_msg = ""
                 if hasattr(vs_file, 'last_error') and vs_file.last_error:

@@ -5,6 +5,9 @@ from config import OUTPUT_DIR, STATE_FILE, OPENAI_API_KEY
 from state_manager import StateManager
 from vector_store_manager import VectorStoreManager
 from scraper import Scraper
+import boto3
+from botocore.exceptions import NoCredentialsError, ClientError
+import json
 
 # Setup logging
 logging.basicConfig(
@@ -24,7 +27,7 @@ def main():
         logging.info("Starting OptiBot scraper job")
         logging.info("=" * 60)
         
-        state_manager = StateManager(STATE_FILE)
+        state_manager = StateManager()
         vector_manager = VectorStoreManager(OPENAI_API_KEY)
         scraper = Scraper(OUTPUT_DIR)
         
@@ -59,8 +62,8 @@ def main():
                         exit_code = 1
                 # remove local file if exists
                 state_manager.remove_article_state(article_id)
-            stats["deleted"] += 1
-            logging.info(f"Removed article {article_id} from state.")
+                stats["deleted"] += 1
+                logging.info(f"Removed article {article_id} from state.")
         
         # Process articles with enhanced delta detection
         for article in articles:
@@ -133,8 +136,8 @@ def main():
             exit_code = 1
         
         # Log vector store statistics
-        if vs_id:
-            vector_manager.log_vector_store_stats(vs_id)
+        # if vs_id:
+        #     vector_manager.log_vector_store_stats(vs_id)
         
         logging.info("=" * 60)
         logging.info(f"Job Complete. Stats: {stats}")
@@ -152,9 +155,49 @@ def main_test():
     
     Orchestrates the scraping, processing, state management, and OpenAI upload workflow.
     """
+    bucket_name = os.getenv("BUCKET_NAME")
+    bucket_secret_access_key = os.getenv("BUCKET_SECRET_ACCESS_KEY")
+    state_key = "state.json"
+
+    s3_client = boto3.client(
+        's3',
+        region_name='fra1',
+        endpoint_url='https://fra1.digitaloceanspaces.com',
+        aws_access_key_id=os.getenv("BUCKET_ACCESS_KEY_ID"),
+        aws_secret_access_key=bucket_secret_access_key
+    )
+
+    try:
+        response = s3_client.get_object(
+            Bucket=bucket_name,
+            Key=state_key
+        )
+        content = response['Body'].read().decode('utf-8')
+        if not content.strip():
+            return {"articles": {}, "vector_store_id": None}
+        print(content)
+        return json.loads(content)
+    except ClientError as e:
+        if e.response['Error']['Code'] == 'NoSuchKey':
+            logging.info("No existing state in Spaces, starting fresh.")
+            return {"articles": {}, "vector_store_id": None}
+        logging.error(f"Error loading state from Spaces: {e}")
+        return {"articles": {}, "vector_store_id": None}
+    except Exception as e:
+        logging.warning(f"Error loading state from Spaces: {e}. Starting fresh.")
+        return {"articles": {}, "vector_store_id": None}
+
+def clear_everything():
+    state_manager = StateManager()
+    vector_manager = VectorStoreManager(OPENAI_API_KEY)
     scraper = Scraper(OUTPUT_DIR)
-    articles = scraper.fetch_articles(limit=None)
-    print(f"Fetched {len(articles)} articles.")
+
+    vector_manager.clear_all_files_from_vector_store('vs_697b2d0fe55c8191838044152526f53a')
+    vector_manager.clear_file_from_storage()
+    state_manager.remove_all_article_states()
+    scraper.clear_output_directory()
+    return 0
+
 
 if __name__ == "__main__":
     exit_code = main()

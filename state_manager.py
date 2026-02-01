@@ -13,20 +13,20 @@ class StateManager:
     def __init__(self):
         """Initializes the StateManager, get state from DO bucket
         """
-        self.use_bucket = use_bucket or os.getenv("USE_DO_BUCKET", "false").lower() == "true"
         
         # digitalOcean spaces
         self.bucket_name = os.getenv("BUCKET_NAME")
         self.bucket_secret_access_key = os.getenv("BUCKET_SECRET_ACCESS_KEY")
-        
-        if self.use_bucket:
-            self.s3_client = boto3.client(
-                's3',
-                region_name='fra1',
-                endpoint_url='https://fra1.digitaloceanspaces.com',
-                aws_access_key_id=os.getenv("BUCKET_ACCESS_KEY_ID"),
-                aws_secret_access_key=self.bucket_secret_access_key
-            )
+        self.state_key = "state.json"
+
+        self.s3_client = boto3.client(
+            's3',
+            region_name='fra1',
+            endpoint_url='https://fra1.digitaloceanspaces.com',
+            aws_access_key_id=os.getenv("BUCKET_ACCESS_KEY_ID"),
+            aws_secret_access_key=self.bucket_secret_access_key
+        )
+
         self.state = self._load_state()
     def _load_state(self):
         """Loads the state from DO bucket. 
@@ -34,24 +34,38 @@ class StateManager:
         Returns:
             dict: The loaded state or a default empty state if the file doesn't exist.
         """
-        if not os.path.exists(self.state_file):
-            return {"articles": {}, "vector_store_id": None}
         try:
-            with open(self.state_file, 'r', encoding="utf-8") as f:
-                content = f.read().strip()
-                if not content: 
-                    return {"articles": {}, "vector_store_id": None}
-                return json.loads(content)
-        except Exception:
-            logging.warning(f"State file {self.state_file} is corrupted. Resetting state.")
+            response = self.s3_client.get_object(
+                Bucket=self.bucket_name,
+                Key=self.state_key
+            )
+            content = response['Body'].read().decode('utf-8')
+            if not content.strip():
+                return {"articles": {}, "vector_store_id": None}
+            return json.loads(content)
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchKey':
+                logging.info("No existing state in Spaces, starting fresh.")
+                return {"articles": {}, "vector_store_id": None}
+            logging.error(f"Error loading state from Spaces: {e}")
+            return {"articles": {}, "vector_store_id": None}
+        except Exception as e:
+            logging.warning(f"Error loading state from Spaces: {e}. Starting fresh.")
             return {"articles": {}, "vector_store_id": None}
 
     def save_state(self):
         """Saves the current state to the JSON file."""
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
-        with open(self.state_file, 'w') as f:
-            json.dump(self.state, f, indent=2)
+        try:
+            self.s3_client.put_object(
+                Bucket=self.bucket_name,
+                Key=self.state_key,
+                Body=json.dumps(self.state, indent=2),
+                ContentType='application/json'
+            )
+            logging.info("State saved to DigitalOcean Spaces.")
+        except Exception as e:
+            logging.error(f"Error saving state to Spaces: {e}")
+            raise
 
     def get_article_state(self, article_id):
         """Retrieves the state for a specific article.
